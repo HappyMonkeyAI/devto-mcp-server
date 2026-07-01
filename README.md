@@ -2,6 +2,10 @@
 
 MCP server providing tools to search and retrieve articles from dev.to API.
 
+**For agent planning workflows**, use the umbrella server **`article-research-mcp`** (`article_research` in Dynamic MCP catalogue) — dedupe, ranked briefs, methodology, and `save_research_note`.
+
+**Agent docs:** `CONTEXT.md`, `HERMES.md`, `docs/adr/`
+
 ## Tools
 
 - `search_devto_posts`: Search dev.to articles by query, with optional tag, limit, etc.
