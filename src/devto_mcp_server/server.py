@@ -1,20 +1,102 @@
 #!/usr/bin/env python3
 """dev.to MCP Server - Wraps dev.to public API with useful research tools."""
 
+import os
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import httpx
 from mcp.server.fastmcp import FastMCP
-from typing import Optional, List, Dict, Any
 
 # Create the MCP server
 mcp = FastMCP("devto-mcp-server")
 
 DEVTO_API_BASE = "https://dev.to/api"
+DEVTO_API_KEY_ENV = "DEVTO_API_KEY"
+DOTENV_PATH = Path.cwd() / ".env"
 
 
-async def _fetch_json(url: str, params: Optional[Dict] = None) -> Any:
+def _load_local_env(path: Optional[Path] = None) -> None:
+    """Load simple KEY=VALUE pairs from a local .env without overriding process env."""
+    dotenv_path = path or DOTENV_PATH
+    if not dotenv_path.exists():
+        return
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+async def _fetch_json(url: str, params: Optional[Dict[str, Any]] = None) -> Any:
     """Helper to fetch JSON from dev.to API."""
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(url, params=params)
+        resp.raise_for_status()
+        return resp.json()
+
+
+def _get_api_key(api_key: Optional[str] = None) -> str:
+    """Resolve a DEV API key from an explicit parameter, process env, or local .env."""
+    if not api_key:
+        _load_local_env()
+    resolved = api_key or os.getenv(DEVTO_API_KEY_ENV)
+    if not resolved:
+        raise ValueError(
+            f"dev.to write tools require an API key. Pass api_key or set {DEVTO_API_KEY_ENV}."
+        )
+    return resolved
+
+
+def _article_payload(
+    *,
+    title: Optional[str] = None,
+    body_markdown: Optional[str] = None,
+    published: Optional[bool] = None,
+    tags: Optional[str] = None,
+    description: Optional[str] = None,
+    canonical_url: Optional[str] = None,
+    series: Optional[str] = None,
+    main_image: Optional[str] = None,
+    organization_id: Optional[int] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Build the wrapped Article payload expected by the DEV/Forem API."""
+    article: Dict[str, Any] = {}
+    for key, value in {
+        "title": title,
+        "body_markdown": body_markdown,
+        "published": published,
+        "tags": tags,
+        "description": description,
+        "canonical_url": canonical_url,
+        "series": series,
+        "main_image": main_image,
+        "organization_id": organization_id,
+    }.items():
+        if value is not None:
+            article[key] = value
+    return {"article": article}
+
+
+async def _send_article_request(
+    method: str,
+    url: str,
+    payload: Dict[str, Dict[str, Any]],
+    api_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Send an authenticated article create/update request to DEV."""
+    key = _get_api_key(api_key)
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.request(
+            method,
+            url,
+            json=payload,
+            headers={"api-key": key, "Content-Type": "application/json"},
+        )
         resp.raise_for_status()
         return resp.json()
 
@@ -98,6 +180,88 @@ async def search_by_tech(
     url = f"{DEVTO_API_BASE}/articles"
     articles = await _fetch_json(url, params)
     return articles
+
+
+@mcp.tool()
+async def create_devto_article(
+    title: str,
+    body_markdown: str,
+    published: bool = False,
+    tags: Optional[str] = None,
+    description: Optional[str] = None,
+    canonical_url: Optional[str] = None,
+    series: Optional[str] = None,
+    main_image: Optional[str] = None,
+    organization_id: Optional[int] = None,
+    api_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Create a dev.to article or draft using the authenticated DEV API.
+
+    Args:
+        title: Article title.
+        body_markdown: Article body in markdown.
+        published: Publish immediately when true. Defaults to false for safety.
+        tags: Comma-separated tags, e.g. "python,ai,mcp".
+        description: Short article description.
+        canonical_url: Original/canonical URL when cross-posting.
+        series: Optional DEV series name.
+        main_image: Optional main image URL.
+        organization_id: Optional DEV organization id.
+        api_key: Optional DEV API key. If omitted, DEVTO_API_KEY is used.
+
+    Returns:
+        The created article object from dev.to.
+    """
+    payload = _article_payload(
+        title=title,
+        body_markdown=body_markdown,
+        published=published,
+        tags=tags,
+        description=description,
+        canonical_url=canonical_url,
+        series=series,
+        main_image=main_image,
+        organization_id=organization_id,
+    )
+    return await _send_article_request("POST", f"{DEVTO_API_BASE}/articles", payload, api_key)
+
+
+@mcp.tool()
+async def update_devto_article(
+    article_id: int,
+    title: Optional[str] = None,
+    body_markdown: Optional[str] = None,
+    published: Optional[bool] = None,
+    tags: Optional[str] = None,
+    description: Optional[str] = None,
+    canonical_url: Optional[str] = None,
+    series: Optional[str] = None,
+    main_image: Optional[str] = None,
+    organization_id: Optional[int] = None,
+    api_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Update an existing dev.to article by numeric article id.
+
+    Only fields provided as non-null arguments are sent. Pass api_key or set DEVTO_API_KEY.
+    """
+    payload = _article_payload(
+        title=title,
+        body_markdown=body_markdown,
+        published=published,
+        tags=tags,
+        description=description,
+        canonical_url=canonical_url,
+        series=series,
+        main_image=main_image,
+        organization_id=organization_id,
+    )
+    if not payload["article"]:
+        raise ValueError("update_devto_article requires at least one article field to update.")
+    return await _send_article_request(
+        "PUT", f"{DEVTO_API_BASE}/articles/{article_id}", payload, api_key
+    )
 
 
 @mcp.resource("devto://article/{article_id}")

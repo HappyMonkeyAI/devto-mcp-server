@@ -9,12 +9,13 @@ Agents need dev.to access for tutorials. Planning workflows also need dedupe, ra
 
 ## Decision
 
-Keep **devto-mcp-server** as a **lite** three-tool stdio server. Catalogue entry `devto` remains for tag-only workflows. All planning surfaces live in **article-research-mcp** (`article_research`).
+Keep **devto-mcp-server** as a **lite**, direct DEV API stdio server. Catalogue entry `devto` remains for single-source dev.to workflows, including authenticated article create/update. All planning surfaces live in **article-research-mcp** (`article_research`).
 
 ## Consequences
 
 - README and CONTEXT must point planners to the umbrella server.
 - Launcher registry tracks both slugs with same path discipline (no duplicate planning tools).
+- Write tools require DEV API key auth and should default new posts to drafts unless the caller explicitly publishes.
 
 ## Alternatives considered
 

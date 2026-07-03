@@ -1,6 +1,6 @@
 # devto-mcp-server
 
-MCP server providing tools to search and retrieve articles from dev.to API.
+MCP server providing tools to search, retrieve, create, and update articles via the dev.to API.
 
 **For agent planning workflows**, use the umbrella server **`article-research-mcp`** (`article_research` in Dynamic MCP catalogue) — dedupe, ranked briefs, methodology, and `save_research_note`.
 
@@ -11,6 +11,26 @@ MCP server providing tools to search and retrieve articles from dev.to API.
 - `search_devto_posts`: Search dev.to articles by query, with optional tag, limit, etc.
 - `get_devto_article`: Fetch full article by ID or slug.
 - `search_by_tech`: Search articles by technology/tag (e.g., python, ai, mcp).
+- `create_devto_article`: Create a draft or published dev.to article. Uses `DEVTO_API_KEY` unless `api_key` is passed.
+- `update_devto_article`: Update fields on an existing dev.to article. Uses `DEVTO_API_KEY` unless `api_key` is passed.
+
+## Auth for write tools
+
+Create a DEV API key at https://dev.to/settings/extensions, then set:
+
+```bash
+export DEVTO_API_KEY=your_key_here
+```
+
+For local development, you can also put the key in the repo-local `.env` file:
+
+```dotenv
+DEVTO_API_KEY=your_key_here
+```
+
+`.env` is ignored by git; `.env.example` documents the expected variable.
+
+`create_devto_article` defaults `published` to `false` so new API-created posts are drafts unless explicitly published.
 
 ## Usage with dynamic-mcp-proxy-server
 
