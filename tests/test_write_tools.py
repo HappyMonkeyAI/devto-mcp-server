@@ -101,7 +101,7 @@ def test_create_devto_article_posts_wrapped_payload(monkeypatch):
                     "title": "Draft",
                     "body_markdown": "# Body",
                     "published": False,
-                    "tags": "ai,mcp",
+                    "tags": ["ai", "mcp"],
                 }
             },
             "headers": {"api-key": "secret-key", "Content-Type": "application/json"},

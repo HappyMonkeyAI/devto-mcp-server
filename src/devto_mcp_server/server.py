@@ -66,11 +66,16 @@ def _article_payload(
 ) -> Dict[str, Dict[str, Any]]:
     """Build the wrapped Article payload expected by the DEV/Forem API."""
     article: Dict[str, Any] = {}
+    normalized_tags = None
+    if tags is not None:
+        normalized_tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
     for key, value in {
         "title": title,
         "body_markdown": body_markdown,
         "published": published,
-        "tags": tags,
+        # Forem's current API accepts tags as an array. It may silently discard
+        # the legacy comma-delimited string while still returning HTTP 201.
+        "tags": normalized_tags,
         "description": description,
         "canonical_url": canonical_url,
         "series": series,
@@ -273,7 +278,9 @@ async def get_article_resource(article_id: str) -> str:
 
 def main():
     """Entry point for the MCP server."""
-    mcp.run(show_banner=False, log_level="WARNING")
+    # mcp.server.fastmcp.FastMCP.run() no longer accepts the newer
+    # fastmcp package's show_banner/log_level keyword arguments.
+    mcp.run()
 
 
 if __name__ == "__main__":
